@@ -1,3 +1,13 @@
+This is a fork of Baron Schwartz date formatting and parsing library.
+I added namespacing, simplified the function generators, wrote unit tests,
+and fixed some bugs. It remains under the LPGL. I would like to stress that
+all the core design ideas (namely the code generator approach) and legwork
+of implementing the many different formatting flags are his; I'm just the
+janitor.
+
+Below this line is the original README:
+-------------------------------------------------------------------------------
+
 This is a JavaScript date parsing and formatting library, date-functions.js.
 
 Copyright (C) 2006 Baron Schwartz <baron at sequent dot org>
