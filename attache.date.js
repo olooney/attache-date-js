@@ -20,10 +20,6 @@
 	var parseRegexes = [];
 	var formatFunctions = {};
 
-	// TODO: don't expose these
-	date.formatFunctions = formatFunctions;
-	date.parseFunctions = parseFunctions;
-
 	date.format = function(d, format) {
 		if ( !formatFunctions[format] ) {
 			formatFunctions[format] = createFormatFunction(format);
@@ -36,10 +32,6 @@
 		var ch = '';
 		var pieces = [];
 		
-		// the function written by the below algorithm won't compile
-		// with zero formatting pieces so just treat it as a special case.
-		if ( format.length === 0 ) return function() { return ''; }
-
 		for (var i = 0; i < format.length; ++i) {
 			// TODO: instead of the special flag, we could just increment i
 			ch = format.charAt(i);
@@ -55,10 +47,9 @@
 				pieces.push( formatCodeForMaskCharacter(ch) );
 			}
 		}
-		// TODO: I worry that using the plus operator to concatinate strings
-		// might add two numbers together... several of the below pieces do
-		// return numbers!
-		return compile("function(d){return " + pieces.join(' + ') + ";}");
+		// joining an array of '' has two benefits: it automatically handles the empty
+		// string case, and it coerces every piece to a string, avoid adding numbers.
+		return compile("function(d){return [" + pieces.join(', ') + "].join('');}");
 	}
 
 	function formatCodeForMaskCharacter(character) {
@@ -72,13 +63,13 @@
 		case "l":
 			return "date.dayNames[d.getDay()]";
 		case "S":
-			return "get.suffix(d)";
+			return "suffix(d)";
 		case "w":
 			return "d.getDay()";
 		case "z":
-			return "get.dayOfYear(d)";
+			return "dayOfYear(d)";
 		case "W":
-			return "get.weekOfYear(d)";
+			return "weekOfYear(d)";
 		case "F":
 			return "date.monthNames[d.getMonth()]";
 		case "m":
@@ -88,9 +79,9 @@
 		case "n":
 			return "(d.getMonth() + 1)";
 		case "t":
-			return "get.daysInMonth(d)";
+			return "daysInMonth(d)";
 		case "L":
-			return "(get.isLeapYear(d) ? 1 : 0)";
+			return "(isLeapYear(d) ? 1 : 0)";
 		case "Y":
 			return "d.getFullYear()";
 		case "y":
@@ -112,14 +103,24 @@
 		case "s":
 			return "zpad(d.getSeconds(), 2)";
 		case "O":
-			return "get.GMTOffset(d)";
+			return "GMTOffset(d)";
 		case "T":
-			return "get.timezone(d)";
+			return "timezone(d)";
 		case "Z":
 			return "(d.getTimezoneOffset() * -60)";
 		default:
 			return "'" + escapeRegex(character) + "'";
 		}
+		// TODO: 
+		// B, swatch internet time
+		//   Math.floor((((d.getUTCHours() + 1)%24) + d.getUTCMinutes()/60 +  d.getUTCSeconds()/3600)*1000/24);
+		//   or something like that.
+		// r, RFC 2822
+		//   date.format(d, 'D, j M Y H:i:s O')
+		// I, 0 or 1 for daylightsavings time or not.
+		// c, ISO 8601 date... example: 2004-02-12T15:19:21+00:00 (what's with the offset?)
+		// U, seconds since epoch:
+		//   Math.floor(this.getTime()/1000)
 	}
 
 	// Function parse(String input, String format) -> Date
@@ -137,6 +138,7 @@
 		var regexNum = parseRegexes.length;
 		var currentGroup = 1;
 
+		// TODO don't really need newlines (or any whitespace, really) in generated code
 		var code = "function(input){\n"
 			+ "var y = -1, m = -1, d = -1, h = -1, i = -1, s = -1;\n"
 			+ "var d = new Date();\n"
@@ -168,6 +170,7 @@
 			}
 		}
 
+		// TODO don't really need newlines (or any whitespace, really) in generated code
 		code += "if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0 && s >= 0)\n"
 			+ "{return new Date(y, m, d, h, i, s);}\n"
 			+ "else if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0)\n"
@@ -293,64 +296,61 @@
 	}
 
 	// *****  helper functions to extract relevant pieces from date objects. *****
-	var get = {
-		timezone: function(d) {
-			return d.toString().replace(
-				/^.*? ([A-Z]{3}) [0-9]{4}.*$/, "$1").replace(
-				/^.*?\(([A-Z])[a-z]+ ([A-Z])[a-z]+ ([A-Z])[a-z]+\)$/, "$1$2$3");
-		},
+	function timezone(d) {
+		// TODO this seems hackish. Is this really going to work in all browsers?
+		var match = (/\((\w{3})\)/).exec(d+'');
+		return match ? match[1] : '';
+	}
 
-		GMTOffset: function(d) {
-			var tzo = d.getTimezoneOffset();
-			return (tzo > 0 ? "-" : "+") + zpad(Math.floor(tzo / 60), 2) + zpad(tzo % 60, 2);
-		},
+	function GMTOffset(d) {
+		var tzo = d.getTimezoneOffset();
+		return (tzo > 0 ? "-" : "+") + zpad(Math.floor(tzo / 60), 2) + zpad(tzo % 60, 2);
+	}
 
-		dayOfYear: function(d) {
-			var num = 0;
-			date.daysInMonth[1] = get.isLeapYear(d) ? 29 : 28;
-			for (var i = 0; i < d.getMonth(); ++i) {
-				num += date.daysInMonth[i];
-			}
-			return num + d.getDate() - 1;
-		},
-
-		weekOfYear: function(d) {
-			// Skip to Thursday of d week
-			var now = get.dayOfYear(d) + (4 - d.getDay());
-			// Find the first Thursday of the year
-			var jan1 = new Date(d.getFullYear(), 0, 1);
-			var then = (7 - jan1.getDay() + 4);
-			document.write(then);
-			return zpad(((now - then) / 7) + 1, 2);
-		},
-
-		isLeapYear: function(d) {
-			var year = d.getFullYear();
-			return ((year & 3) == 0 && (year % 100 || (year % 400 == 0 && year)));
-		},
-
-		daysInMonth: function(d) {
-			date.daysInMonth[1] = get.isLeapYear(d) ? 29 : 28;
-			return date.daysInMonth[d.getMonth()];
-		},
-
-		suffix: function(d) {
-			switch (d.getDate()) {
-				case 1:
-				case 21:
-				case 31:
-					return "st";
-				case 2:
-				case 22:
-					return "nd";
-				case 3:
-				case 23:
-					return "rd";
-				default:
-					return "th";
-			}
+	function dayOfYear(d) {
+		var num = 0;
+		date.daysInMonth[1] = isLeapYear(d) ? 29 : 28;
+		for (var i = 0; i < d.getMonth(); ++i) {
+			num += date.daysInMonth[i];
 		}
-	};
+		return num + d.getDate() - 1;
+	}
+
+	function weekOfYear(d) {
+		// Skip to Thursday of d week
+		var now = dayOfYear(d) + (4 - d.getDay());
+		// Find the first Thursday of the year
+		var jan1 = new Date(d.getFullYear(), 0, 1);
+		var then = (7 - jan1.getDay() + 4);
+		return zpad(((now - then) / 7) + 1, 2);
+	}
+
+	function isLeapYear(d) {
+		var year = d.getFullYear();
+		return ((year & 3) == 0 && (year % 100 || (year % 400 == 0 && year)));
+	}
+
+	function daysInMonth(d) {
+		date.daysInMonth[1] = isLeapYear(d) ? 29 : 28;
+		return date.daysInMonth[d.getMonth()];
+	}
+
+	function suffix(d) {
+		switch (d.getDate()) {
+			case 1:
+			case 21:
+			case 31:
+				return "st";
+			case 2:
+			case 22:
+				return "nd";
+			case 3:
+			case 23:
+				return "rd";
+			default:
+				return "th";
+		}
+	}
 
 	// *****  private helper functions  *****  
 
@@ -437,5 +437,4 @@
 		UniversalSortableDateTimePattern: "Y-m-d H:i:sO",
 		YearMonthPattern: "F, Y"
 	};
-
 })();
