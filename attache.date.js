@@ -296,10 +296,29 @@
 	}
 
 	// *****  helper functions to extract relevant pieces from date objects. *****
+
+	// returns the three-letter abbreviation for the local timezone, or return
+	// an empty string if this can't be determined.  I've tested this in
+	// Firefox, Chrome, Safari, and IE, and tried to make it reasonably robust,
+	// but who knows if it will work in all browsers, all operating systems,
+	// and internationally? 
 	function timezone(d) {
-		// TODO this seems hackish. Is this really going to work in all browsers?
-		var match = (/\((\w{3})\)/).exec(d+'');
-		return match ? match[1] : '';
+		// look for a "(CDT)"-like pattern
+		var match = (/\((\w+)\)/).exec(d+'');
+		if ( match ) return match[1].toUpperCase();
+		
+		// look for a "(Central Daylight Time)"-like pattern
+		match = (/\(((\w+ ?)+)\)/).exec(d+'');
+		if ( match ) {
+			var pieces = match[1].split(' ');
+			return initials(pieces);
+		}
+
+		// for for a "Tue Jul 19 15:29:51 CDT 2011"-like pattern
+		match = (/^\w+ \w+ \d+ \d+:\d+:\d+ (\w+) \d+$/).exec(d+'');
+		if ( match ) return match[1].toUpperCase();
+
+		return '';
 	}
 
 	function GMTOffset(d) {
@@ -353,6 +372,15 @@
 	}
 
 	// *****  private helper functions  *****  
+
+	// extract the first initial of a word
+	function initials(words) { 
+		var initials = "";
+		for ( var i=0; i<words.length; i++ ) {
+			initials += words[i].charAt(0).toUpperCase();
+		}
+		return initials;
+	}
 
 	// escape a string for use in a regular expression.  Any characters
 	// which have special meaning in a regex will be escaped with a forward slash.
