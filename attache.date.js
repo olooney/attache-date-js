@@ -40,8 +40,7 @@
 			}
 			else if (special) {
 				special = false;
-				// TODO: shouldn't we escape a ' string, not a regex?
-				pieces.push("'" + escapeRegex(ch) + "'");
+				pieces.push(quote(ch));
 			}
 			else {
 				pieces.push( formatCodeForMaskCharacter(ch) );
@@ -49,7 +48,8 @@
 		}
 		// joining an array of '' has two benefits: it automatically handles the empty
 		// string case, and it coerces every piece to a string, avoid adding numbers.
-		return compile("function(d){return [" + pieces.join(', ') + "].join('');}");
+		var code = "function(d){return [" + pieces.join(', ') + "].join('');}";
+		return compile(code);
 	}
 
 	function formatCodeForMaskCharacter(character) {
@@ -109,7 +109,7 @@
 		case "Z":
 			return "(d.getTimezoneOffset() * -60)";
 		default:
-			return "'" + escapeRegex(character) + "'";
+			return quote(character);
 		}
 		// TODO: 
 		// B, swatch internet time
@@ -138,15 +138,16 @@
 		var regexNum = parseRegexes.length;
 		var currentGroup = 1;
 
-		// TODO don't really need newlines (or any whitespace, really) in generated code
-		var code = "function(input){\n"
-			+ "var y = -1, m = -1, d = -1, h = -1, i = -1, s = -1;\n"
-			+ "var d = new Date();\n"
-			+ "y = d.getFullYear();\n"
-			+ "m = d.getMonth();\n"
-			+ "d = d.getDate();\n"
-			+ "var results = input.match(parseRegexes[" + regexNum + "]);\n"
-			+ "if (results && results.length > 0) {"
+		var code = [
+			"function(input){",
+				"var y = -1, m = -1, d = -1, h = -1, i = -1, s = -1;",
+				"var d = new Date();",
+				"y = d.getFullYear();",
+				"m = d.getMonth();",
+				"d = d.getDate();",
+				"var results = input.match(parseRegexes[" + regexNum + "]);",
+				"if (results && results.length > 0) {"
+		].join('');
 		var regex = "";
 
 		var special = false;
@@ -170,20 +171,23 @@
 			}
 		}
 
-		// TODO don't really need newlines (or any whitespace, really) in generated code
-		code += "if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0 && s >= 0)\n"
-			+ "{return new Date(y, m, d, h, i, s);}\n"
-			+ "else if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0)\n"
-			+ "{return new Date(y, m, d, h, i);}\n"
-			+ "else if (y > 0 && m >= 0 && d > 0 && h >= 0)\n"
-			+ "{return new Date(y, m, d, h);}\n"
-			+ "else if (y > 0 && m >= 0 && d > 0)\n"
-			+ "{return new Date(y, m, d);}\n"
-			+ "else if (y > 0 && m >= 0)\n"
-			+ "{return new Date(y, m);}\n"
-			+ "else if (y > 0)\n"
-			+ "{return new Date(y);}\n"
-			+ "}return null;}";
+		code += [
+					"if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0 && s >= 0)",
+						"{return new Date(y, m, d, h, i, s);}",
+					"else if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0)",
+						"{return new Date(y, m, d, h, i);}",
+					"else if (y > 0 && m >= 0 && d > 0 && h >= 0)",
+						"{return new Date(y, m, d, h);}",
+					"else if (y > 0 && m >= 0 && d > 0)",
+						"{return new Date(y, m, d);}",
+					"else if (y > 0 && m >= 0)",
+						"{return new Date(y, m);}",
+					"else if (y > 0)",
+						"{return new Date(y);}",
+				"}",
+				"return null;",
+			"}"
+		].join('');
 
 		parseRegexes[regexNum] = new RegExp("^" + regex + "$");
 		return compile(code);
@@ -328,9 +332,9 @@
 
 	function dayOfYear(d) {
 		var num = 0;
-		date.daysInMonth[1] = isLeapYear(d) ? 29 : 28;
+		fluxDaysInMonth[1] = isLeapYear(d) ? 29 : 28;
 		for (var i = 0; i < d.getMonth(); ++i) {
-			num += date.daysInMonth[i];
+			num += fluxDaysInMonth[i];
 		}
 		return num + d.getDate() - 1;
 	}
@@ -350,8 +354,8 @@
 	}
 
 	function daysInMonth(d) {
-		date.daysInMonth[1] = isLeapYear(d) ? 29 : 28;
-		return date.daysInMonth[d.getMonth()];
+		fluxDaysInMonth[1] = isLeapYear(d) ? 29 : 28;
+		return fluxDaysInMonth[d.getMonth()];
 	}
 
 	function suffix(d) {
@@ -388,6 +392,11 @@
 		return String(pattern).replace(/[.*+?|()[\]{}\\^$]/g, "\\$&");
 	}
 
+	// quotes a string as a JavaScript single-quoted string literal.
+	function quote(s) {
+		return "'" + String(s).replace(/'/g, "\\'") + "'";
+	}
+
 	// left pad a number out with zeros.
 	function zpad(val, size) {
 		var result = String(val);
@@ -412,8 +421,8 @@
 	}
 
 	// *****  data tables  *****
-	// TODO: make sure the public data structure doesn't flucuate in February.
 	date.daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+	var fluxDaysInMonth = date.daysInMonth.slice();
 	date.monthNames =
 	   ["January",
 		"February",
