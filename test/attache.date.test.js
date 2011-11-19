@@ -44,7 +44,6 @@
 	test('parse', function() {
 		// TODO: test all the other mask characters...
 		var d = attache.date.parse("2011-11-21 15:32:02", "Y-m-d H:i:s");
-		owlParsedDate  = d;
 		equals(d.getFullYear(), 2011, "year");
 		equals(d.getMonth(), 10, "month"); // months start at 0
 		equals(d.getDate(), 21, "date");

@@ -20,29 +20,32 @@
 	var parseRegexes = [];
 	var formatFunctions = {};
 
+	// Public Function: format(Date d, String format) -> String
+	//   Formats the given Date object according to the PHP
+	// date format string. If d is not a Date, returns "".
 	date.format = function(d, format) {
+		if ( !(d instanceof Date ) ) return "";
+
+		// if this is the first time we've seen this exact format,
+		// compile and cache a custom formatting function.
 		if ( !formatFunctions[format] ) {
 			formatFunctions[format] = createFormatFunction(format);
 		}
+
 		return formatFunctions[format](d);
 	}
 
+	// writes the (very simple) code necessary to format a Date
 	function createFormatFunction(format) {
-		var special = false;
-		var ch = '';
 		var pieces = [];
 		
 		for (var i = 0; i < format.length; ++i) {
-			// TODO: instead of the special flag, we could just increment i
-			ch = format.charAt(i);
-			if (!special && ch == "\\") {
-				special = true;
-			}
-			else if (special) {
-				special = false;
-				pieces.push(quote(ch));
-			}
-			else {
+			var ch = format.charAt(i);
+			if (ch === "\\") {
+				++i;
+				ch = format.charAt(i);
+				if ( ch ) pieces.push(quote(ch));
+			} else {
 				pieces.push( formatCodeForMaskCharacter(ch) );
 			}
 		}
@@ -52,64 +55,37 @@
 		return compile(code);
 	}
 
+	// returns the snippet of code for each formatting character.
 	function formatCodeForMaskCharacter(character) {
 		switch (character) {
-		case "d":
-			return "zpad(d.getDate(), 2)";
-		case "D":
-			return "date.dayNames[d.getDay()].substring(0, 3)";
-		case "j":
-			return "d.getDate()";
-		case "l":
-			return "date.dayNames[d.getDay()]";
-		case "S":
-			return "suffix(d)";
-		case "w":
-			return "d.getDay()";
-		case "z":
-			return "dayOfYear(d)";
-		case "W":
-			return "weekOfYear(d)";
-		case "F":
-			return "date.monthNames[d.getMonth()]";
-		case "m":
-			return "zpad(d.getMonth() + 1, 2)";
-		case "M":
-			return "date.monthNames[d.getMonth()].substring(0, 3)";
-		case "n":
-			return "(d.getMonth() + 1)";
-		case "t":
-			return "daysInMonth(d)";
-		case "L":
-			return "(isLeapYear(d) ? 1 : 0)";
-		case "Y":
-			return "d.getFullYear()";
-		case "y":
-			return "('' + d.getFullYear()).substring(2, 4)";
-		case "a":
-			return "(d.getHours() < 12 ? 'am' : 'pm')";
-		case "A":
-			return "(d.getHours() < 12 ? 'AM' : 'PM')";
-		case "g":
-			return "((d.getHours() %12) ? d.getHours() % 12 : 12)";
-		case "G":
-			return "d.getHours()";
-		case "h":
-			return "zpad((d.getHours() %12) ? d.getHours() % 12 : 12, 2)";
-		case "H":
-			return "zpad(d.getHours(), 2)";
-		case "i":
-			return "zpad(d.getMinutes(), 2)";
-		case "s":
-			return "zpad(d.getSeconds(), 2)";
-		case "O":
-			return "GMTOffset(d)";
-		case "T":
-			return "timezone(d)";
-		case "Z":
-			return "(d.getTimezoneOffset() * -60)";
-		default:
-			return quote(character);
+		case "d": return "zpad(d.getDate(), 2)";
+		case "D": return "date.dayNames[d.getDay()].substring(0, 3)";
+		case "j": return "d.getDate()";
+		case "l": return "date.dayNames[d.getDay()]";
+		case "S": return "suffix(d)";
+		case "w": return "d.getDay()";
+		case "z": return "dayOfYear(d)";
+		case "W": return "weekOfYear(d)";
+		case "F": return "date.monthNames[d.getMonth()]";
+		case "m": return "zpad(d.getMonth() + 1, 2)";
+		case "M": return "date.monthNames[d.getMonth()].substring(0, 3)";
+		case "n": return "(d.getMonth() + 1)";
+		case "t": return "daysInMonth(d)";
+		case "L": return "(isLeapYear(d) ? 1 : 0)";
+		case "Y": return "d.getFullYear()";
+		case "y": return "('' + d.getFullYear()).substring(2, 4)";
+		case "a": return "(d.getHours() < 12 ? 'am' : 'pm')";
+		case "A": return "(d.getHours() < 12 ? 'AM' : 'PM')";
+		case "g": return "((d.getHours() %12) ? d.getHours() % 12 : 12)";
+		case "G": return "d.getHours()";
+		case "h": return "zpad((d.getHours() %12) ? d.getHours() % 12 : 12, 2)";
+		case "H": return "zpad(d.getHours(), 2)";
+		case "i": return "zpad(d.getMinutes(), 2)";
+		case "s": return "zpad(d.getSeconds(), 2)";
+		case "O": return "GMTOffset(d)";
+		case "T": return "timezone(d)";
+		case "Z": return "(d.getTimezoneOffset() * -60)";
+		default: return quote(character); // embed the literal character.
 		}
 		// TODO: 
 		// B, swatch internet time
@@ -123,7 +99,7 @@
 		//   Math.floor(this.getTime()/1000)
 	}
 
-	// Function parse(String input, String format) -> Date
+	// Public Function: parse(String input, String format) -> Date
 	//   Accepts a string and a PHP date mask and returns a Date
 	// object if the input string can be interpretted as a Date 
 	// according to the mask format.
@@ -134,34 +110,32 @@
 		return parseFunctions[format](input);
 	}
 
+	// Writes a parse function that uses a regular expression to break a string
+	// into matched groups, then uses generated code to build a Date object
+	// from the resulting groups.
 	function createParseFunction(format) {
 		var regexNum = parseRegexes.length;
 		var currentGroup = 1;
 
 		var code = [
 			"function(input){",
-				"var y = -1, m = -1, d = -1, h = -1, i = -1, s = -1;",
+				"var h = -1, i = -1, s = -1;",
 				"var d = new Date();",
-				"y = d.getFullYear();",
-				"m = d.getMonth();",
-				"d = d.getDate();",
+				"var y = d.getFullYear();",
+				"var m = d.getMonth();",
+				"var d = d.getDate();",
 				"var results = input.match(parseRegexes[" + regexNum + "]);",
 				"if (results && results.length > 0) {"
 		].join('');
 		var regex = "";
 
-		var special = false;
-		var ch = '';
 		for (var i = 0; i < format.length; ++i) {
-			ch = format.charAt(i);
-			if (!special && ch == "\\") {
-				special = true;
-			}
-			else if (special) {
-				special = false;
-				regex += escapeRegex(ch);
-			}
-			else {
+			var ch = format.charAt(i);
+			if ( ch == "\\" ) {
+				++i;
+				ch = format.charAt(i);
+				if ( ch ) regex += excapeRegex(ch);
+			} else {
 				var obj = maskCharacterToRegex(ch, currentGroup);
 				if ( obj.g ) currentGroup += obj.g;
 				regex += obj.s;
@@ -189,10 +163,18 @@
 			"}"
 		].join('');
 
+		// we can avoid the expense of instantiating a
+		// new regular expression each time the parse function
+		// is called by moving it outside, in this case to
+		// an expanding array of regular expression objects.
 		parseRegexes[regexNum] = new RegExp("^" + regex + "$");
 		return compile(code);
 	}
 
+	// for each possible mask, returns the regular expression
+	// group necessary to match the corresponding piece of date
+	// format and (optionally) the code necessary to interpret
+	// that group.
 	function maskCharacterToRegex(character, currentGroup) {
 		switch (character) {
 		case "D":
@@ -330,6 +312,8 @@
 		return (tzo > 0 ? "-" : "+") + zpad(Math.floor(tzo / 60), 2) + zpad(tzo % 60, 2);
 	}
 
+	// returns the number of days since Jan 1 (between 0 and 364 for
+	// normal years and between 0 and 365 for leap years.)
 	function dayOfYear(d) {
 		var num = 0;
 		fluxDaysInMonth[1] = isLeapYear(d) ? 29 : 28;
@@ -339,6 +323,7 @@
 		return num + d.getDate() - 1;
 	}
 
+	// returns a two digit string from "00" to "53".
 	function weekOfYear(d) {
 		// Skip to Thursday of d week
 		var now = dayOfYear(d) + (4 - d.getDay());
@@ -406,7 +391,7 @@
 		return result;
 	}
 
-	// Function compile(String code) -> Function
+	// Private Function: compile(String code) -> Function
 	//    uses eval() to create a function, in this lexical
 	//  scope, and return it.  Those source code should
 	//  include the full function declaration: 
@@ -423,6 +408,9 @@
 	// *****  data tables  *****
 	date.daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
 	var fluxDaysInMonth = date.daysInMonth.slice();
+
+	// data tables attached to date are public and exposed for
+	// the user's convenience... but please don't modify them!
 	date.monthNames =
 	   ["January",
 		"February",
