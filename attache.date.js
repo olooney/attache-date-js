@@ -85,18 +85,21 @@
 		case "O": return "GMTOffset(d)";
 		case "T": return "timezone(d)";
 		case "Z": return "(d.getTimezoneOffset() * -60)";
+		case "U": return "Math.floor(d.getTime()/1000)";
 		default: return quote(character); // embed the literal character.
 		}
-		// TODO: 
-		// B, swatch internet time
+		// Not Implemented:
+		// B, swatch internet time would be something like:
 		//   Math.floor((((d.getUTCHours() + 1)%24) + d.getUTCMinutes()/60 +  d.getUTCSeconds()/3600)*1000/24);
-		//   or something like that.
+		// but really, who cares?
+		//
+		// These are simply groupers of other formats, use attache.date.patterns instead.
 		// r, RFC 2822
 		//   date.format(d, 'D, j M Y H:i:s O')
-		// I, 0 or 1 for daylightsavings time or not.
 		// c, ISO 8601 date... example: 2004-02-12T15:19:21+00:00 (what's with the offset?)
-		// U, seconds since epoch:
-		//   Math.floor(this.getTime()/1000)
+		//
+		// Not sure how to implement across all browsers.
+		// I, 0 or 1 for daylightsavings time or not.
 	}
 
 	// Public Function: parse(String input, String format) -> Date
@@ -137,14 +140,23 @@
 				if ( ch ) regex += excapeRegex(ch);
 			} else {
 				var obj = maskCharacterToRegex(ch, currentGroup);
+
+				// nearly all objects with custom code capture exactly 1 group.
+				if ( obj.c && !('g' in obj) ) obj.g = 1;
+
+				// number of groups captured by the regular expression.
 				if ( obj.g ) currentGroup += obj.g;
+
+				// append regular expression snippet
 				regex += obj.s;
-				if (obj.g && obj.c) {
-					code += obj.c;
-				}
+
+				// append custom code, if any
+				if ( obj.c ) code += obj.c;
 			}
 		}
 
+		// write a piece of code that figures out which date components we have
+		// and builds a Date object from them.
 		code += [
 					"if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0 && s >= 0)",
 						"{return new Date(y, m, d, h, i, s);}",
@@ -177,105 +189,57 @@
 	// that group.
 	function maskCharacterToRegex(character, currentGroup) {
 		switch (character) {
-		case "D":
-			return { s:"(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)" };
-		case "j":
-		case "d":
-			return {
-				g:1,
-				c:"d = parseInt(results[" + currentGroup + "], 10);\n",
-				s:"(\\d{1,2})"
-			};
-		case "l":
-			return { s:"(?:" + date.dayNames.join("|") + ")" };
-		case "S":
-			return { s:"(?:st|nd|rd|th)" };
-		case "w":
-			return { s:"\\d" };
-		case "z":
-			return { s:"(?:\\d{1,3})" };
-		case "W":
-			return { s:"(?:\\d{2})" };
-		case "F":
-			return {
-				g:1,
-				c:"m = parseInt(date.monthNumbers[results[" + currentGroup + "].substring(0, 3)], 10);\n",
-				s:"(" + date.monthNames.join("|") + ")"
-			};
-		case "M":
-			return {
-				g:1,
-				c:"m = parseInt(date.monthNumbers[results[" + currentGroup + "]], 10);\n",
-				s:"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
-			};
+		case "D": return { s:"(?:Sun|Mon|Tue|Wed|Thu|Fri|Sat)" };
+		case "j": 
+		case "d": return { c:"d = parseInt(results[" + currentGroup + "], 10);\n", s:"(\\d{1,2})" };
+		case "l": return { s:"(?:" + date.dayNames.join("|") + ")" };
+		case "S": return { s:"(?:st|nd|rd|th)" };
+		case "w": return { s:"\\d" };
+		case "z": return { s:"(?:\\d{1,3})" };
+		case "W": return { s:"(?:\\d{2})" };
+		case "F": return {
+			c:"m = parseInt(date.monthNumbers[results[" + currentGroup + "].substring(0, 3)], 10);\n",
+			s:"(" + date.monthNames.join("|") + ")"
+		};
+		case "M": return {
+			c:"m = parseInt(date.monthNumbers[results[" + currentGroup + "]], 10);\n",
+			s:"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+		};
 		case "n":
-		case "m":
-			return {
-				g:1,
-				c:"m = parseInt(results[" + currentGroup + "], 10) - 1;\n",
-				s:"(\\d{1,2})"
-			};
-		case "t":
-			return { s:"\\d{1,2}"};
-		case "L":
-			return {
-				s:"(?:1|0)"};
-		case "Y":
-			return {
-				g:1,
-				c:"y = parseInt(results[" + currentGroup + "], 10);\n",
-				s:"(\\d{4})"
-			};
-		case "y":
-			return {
-				g:1,
-				c:"var ty = parseInt(results[" + currentGroup + "], 10);\n"
-					+ "y = ty > date.y2kYear ? 1900 + ty : 2000 + ty;\n",
-				s:"(\\d{1,2})"
-			};
-		case "a":
-			return {
-				g:1,
-				c:"if (results[" + currentGroup + "] == 'am') {\n"
-					+ "if (h == 12) { h = 0; }\n"
-					+ "} else { if (h < 12) { h += 12; }}",
-				s:"(am|pm)"
-			};
-		case "A":
-			return {
-				g:1,
-				c:"if (results[" + currentGroup + "] == 'AM') {\n"
-					+ "if (h == 12) { h = 0; }\n"
-					+ "} else { if (h < 12) { h += 12; }}",
-				s:"(AM|PM)"
-			};
+		case "m": return { c:"m = parseInt(results[" + currentGroup + "], 10) - 1;\n", s:"(\\d{1,2})" };
+		case "t": return { s:"\\d{1,2}"};
+		case "L": return { s:"(?:1|0)"};
+		case "Y": return { c:"y = parseInt(results[" + currentGroup + "], 10);\n", s:"(\\d{4})" };
+		case "y": return {
+			c:"var ty = parseInt(results[" + currentGroup + "], 10);\n"
+				+ "y = ty > date.y2kYear ? 1900 + ty : 2000 + ty;\n",
+			s:"(\\d{1,2})"
+		};
+		case "a": return {
+			c:"if (results[" + currentGroup + "] == 'am') {\n"
+				+ "if (h == 12) { h = 0; }\n"
+				+ "} else { if (h < 12) { h += 12; }}",
+			s:"(am|pm)"
+		};
+		case "A": return {
+			c:"if (results[" + currentGroup + "] == 'AM') {\n"
+				+ "if (h == 12) { h = 0; }\n"
+				+ "} else { if (h < 12) { h += 12; }}",
+			s:"(AM|PM)"
+		};
 		case "g":
 		case "G":
 		case "h":
-		case "H":
-			return {
-				g:1,
-				c:"h = parseInt(results[" + currentGroup + "], 10);\n",
-				s:"(\\d{1,2})"
+		case "H": return { c:"h = parseInt(results[" + currentGroup + "], 10);\n", s:"(\\d{1,2})" };
+		case "i": return { c:"i = parseInt(results[" + currentGroup + "], 10);\n", s:"(\\d{2})" };
+		case "s": return { c:"s = parseInt(results[" + currentGroup + "], 10);\n", s:"(\\d{2})" };
+		case "O": return { s:"[+-]\\d{4}" };
+		case "T": return { s:"[A-Z]{3}" };
+		case "Z": return { s:"[+-]\\d{1,5}" };
+		case "U": return { 
+				c:"return new Date(parseInt(results[" + currentGroup + "], 10)*1000);\n",
+				s:"(\\d+)"
 			};
-		case "i":
-			return {
-				g:1,
-				c:"i = parseInt(results[" + currentGroup + "], 10);\n",
-				s:"(\\d{2})"
-			};
-		case "s":
-			return {
-				g:1,
-				c:"s = parseInt(results[" + currentGroup + "], 10);\n",
-				s:"(\\d{2})"
-			};
-		case "O":
-			return { s:"[+-]\\d{4}" };
-		case "T":
-			return { s:"[A-Z]{3}" };
-		case "Z":
-			return { s:"[+-]\\d{1,5}" };
 		default:
 			return { s:escapeRegex(character)};
 		}
