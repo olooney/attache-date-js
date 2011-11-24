@@ -361,12 +361,12 @@
 	//  include the full function declaration: 
 	//    "function(x,y) { return x+y; }"
 	function compile(code) {
-		var f;
-		eval('f = (' + code + ')');
-		if ( typeof f !== 'function' ) {
+		var $attache_date_compile$;
+		eval('$attache_date_compile$ = (' + code + ')');
+		if ( typeof $attache_date_compile$ !== 'function' ) {
 			throw Error("couldn't compile \"" + code + "\" to a function.");
 		}
-		return f;
+		return $attache_date_compile$;
 	}
 
 	// *****  data tables  *****
