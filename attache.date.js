@@ -1,5 +1,7 @@
-/*
+/* Date Formatting and Parsing
+ *
  * Copyright (C) 2004 Baron Schwartz <baron at sequent dot org>
+ * Copyright (C) 2011 Oran Looney <olooney at gmail dot com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as published by the
@@ -9,18 +11,20 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
  * FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
  * details.
+ * 
  */
 
 (function() { 
-
 	window.attache = window.attache || {};
 	var date = attache.date = attache.date || {};
+
+	// library version, bumping major version for attache namespacing
+	date.version = "2.0";
 
 	var parseFunctions = {};
 	var parseRegexes = [];
 	var formatFunctions = {};
 
-	// Public Function: format(Date d, String format) -> String
 	//   Formats the given Date object according to the PHP
 	// date format string. If d is not a Date, returns "".
 	date.format = function(d, format) {
@@ -35,7 +39,7 @@
 		return formatFunctions[format](d);
 	}
 
-	// writes the (very simple) code necessary to format a Date
+	// writes a function to format a date according to the mask.
 	function createFormatFunction(format) {
 		var pieces = [];
 		
@@ -62,7 +66,7 @@
 		case "D": return "date.dayNames[d.getDay()].substring(0, 3)";
 		case "j": return "d.getDate()";
 		case "l": return "date.dayNames[d.getDay()]";
-		case "S": return "suffix(d)";
+		case "S": return "ordinalSuffix(d)";
 		case "w": return "d.getDay()";
 		case "z": return "dayOfYear(d)";
 		case "W": return "weekOfYear(d)";
@@ -102,7 +106,6 @@
 		// I, 0 or 1 for daylightsavings time or not.
 	}
 
-	// Public Function: parse(String input, String format) -> Date
 	//   Accepts a string and a PHP date mask and returns a Date
 	// object if the input string can be interpretted as a Date 
 	// according to the mask format.
@@ -157,6 +160,7 @@
 
 		// write a piece of code that figures out which date components we have
 		// and builds a Date object from them.
+		// TODO: I reckon I could streamline this a bit.
 		code += [
 					"if (y > 0 && m >= 0 && d > 0 && h >= 0 && i >= 0 && s >= 0)",
 						"{return new Date(y, m, d, h, i, s);}",
@@ -297,17 +301,21 @@
 		return zpad(((now - then) / 7) + 1, 2);
 	}
 
+	// returns 1 if leap year, 0 if not.
 	function isLeapYear(d) {
 		var year = d.getFullYear();
 		return ((year & 3) == 0 && (year % 100 || (year % 400 == 0 && year)));
 	}
 
+	// returns 28-31. takes leap year into account for February.
 	function daysInMonth(d) {
 		fluxDaysInMonth[1] = isLeapYear(d) ? 29 : 28;
 		return fluxDaysInMonth[d.getMonth()];
 	}
 
-	function suffix(d) {
+	// returns the two letter suffix for an ordinal day of the month.
+	// not general: only works for inputs between 1 and 31.
+	function ordinalSuffix(d) {
 		switch (d.getDate()) {
 			case 1:
 			case 21:
@@ -324,9 +332,7 @@
 		}
 	}
 
-	// *****  private helper functions  *****  
-
-	// extract the first initial of a word
+	// returns the initials of a sequence of words
 	function initials(words) { 
 		var initials = "";
 		for ( var i=0; i<words.length; i++ ) {
@@ -337,8 +343,10 @@
 
 	// escape a string for use in a regular expression.  Any characters
 	// which have special meaning in a regex will be escaped with a forward slash.
-	function escapeRegex(pattern) {
-		return String(pattern).replace(/[.*+?|()[\]{}\\^$]/g, "\\$&");
+	// you can then combine the regular expression snippets together and pass
+	// them to the new RegExp constructor.
+	function escapeRegex(word) {
+		return String(word).replace(/[.*+?|()[\]{}\\^$]/g, "\\$&");
 	}
 
 	// quotes a string as a JavaScript single-quoted string literal.
@@ -356,10 +364,16 @@
 	}
 
 	// Private Function: compile(String code) -> Function
-	//    uses eval() to create a function, in this lexical
-	//  scope, and return it.  Those source code should
-	//  include the full function declaration: 
+	//  uses eval() to create a function, in this lexical scope, and return
+	//  it.  Those source code should include the full function declaration: 
+	//
 	//    "function(x,y) { return x+y; }"
+	//
+	//  The advantage of this approach over calling eval directly is that the
+	//  compiled functions will see the private helper  functions in this file,
+	//  but will not incidental variables from the function that called
+	//  compile(). It also hides some of the awkwardness of using eval() to
+	//  create a Function in IE6.
 	function compile(code) {
 		var $attache_date_compile$;
 		eval('$attache_date_compile$ = (' + code + ')');
@@ -369,14 +383,18 @@
 		return $attache_date_compile$;
 	}
 
-	// *****  data tables  *****
+	// *****************************  data tables  *****************************
+	// data tables attached to date are public and exposed for the user's
+	// convenience.
+
 	date.daysInMonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+	// flux days is a private array for the length used only
+	// by the daysInMonth() function to handle leap years.
 	var fluxDaysInMonth = date.daysInMonth.slice();
 
-	// data tables attached to date are public and exposed for
-	// the user's convenience... but please don't modify them!
-	date.monthNames =
-	   ["January",
+	date.monthNames = [
+		"January",
 		"February",
 		"March",
 		"April",
@@ -389,8 +407,9 @@
 		"November",
 		"December"
 	];
-	date.dayNames =
-	   ["Sunday",
+
+	date.dayNames = [
+		"Sunday",
 		"Monday",
 		"Tuesday",
 		"Wednesday",
@@ -398,7 +417,15 @@
 		"Friday",
 		"Saturday"
 	];
+
+	// when parsing a two digit year, this is the cutoff point for 1900 vs
+	// 2000.  by default it is 50, so that 20 digit years are between 1950 and
+	// 2049.  However, you can modify it if you'd like. Excel, for example uses
+	// the "2029 rule", and you'd set attache.date.y2kYear = 30 to emulate that.
 	date.y2kYear = 50;
+
+	// reverse lookup table of month names to index. 
+	// use date.monthNumbers[name.slice(0,3)] to reverse full names.
 	date.monthNumbers = {
 		Jan:0,
 		Feb:1,
@@ -413,6 +440,8 @@
 		Nov:10,
 		Dec:11
 	};
+
+	// commonly used or standardized date formats.
 	date.patterns = {
 		ISO8601LongPattern:"Y-m-d H:i:s",
 		ISO8601ShortPattern:"Y-m-d",

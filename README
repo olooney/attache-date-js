@@ -1,5 +1,8 @@
 https://github.com/olooney/attache-date-js
 
+License And History
+-------------------
+
 This is a fork of Baron Schwartz's date formatting and parsing library.  I
 added namespacing, simplified the function generators, wrote unit tests, and
 fixed some bugs. It no longer installs anything onto Date's prototype.  It
@@ -12,6 +15,7 @@ Baron's original README follow:
 This is a JavaScript date parsing and formatting library, date-functions.js.
 
 Copyright (C) 2006 Baron Schwartz <baron at sequent dot org>
+Copyright (C) 2011 Oran Looney <olooney at gmail dot com>
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -25,3 +29,78 @@ details.
 Changelog:
 
 2006-07-08 Revision 1.1
+2011-11-24 Revision 2.0
+
+
+Documentation
+-------------
+
+attache.date.format: function(Date d, String format) -> String
+  Formats the given Date object according to the PHP
+  date format string. If d is not a Date, returns "".
+
+attache.date.parse: function(String input, String format) -> Date
+  Accepts a string and a PHP date mask and returns a Date
+  object if the input string can be interpretted as a Date 
+  according to the mask format.
+
+attache.date.monthNames: string[]
+  "January" through "December".
+
+attache.date.dayNames: string[]
+  "Sunday" through "Saturday".
+
+attache.date.y2kYear: Number
+  This is the cutoff point for 1900 vs 2000.  by default it is 50, so that
+  2-digit years are between 1950 and 2049. You may change it if you like.
+  For example, you'd set y2kYear = 30 to emulate Excel's "2029 rule."
+
+attache.date.monthNumbers: Object
+  Reverse lookup table of 3-letter month abbreviations to index. 
+  For example, attache.date.monthNumbers['Feb'] == 1.
+  Use date.monthNumbers[name.slice(0,3)] to reverse full names.
+
+attache.date.patterns: Object
+  Contains mask patterns for commonly used or standardized date formats:
+    ISO8601LongPattern:                "Y-m-d H:i:s"
+    ISO8601ShortPattern:               "Y-m-d"
+    ShortDatePattern:                  "n/j/Y"
+    LongDatePattern:                   "l, F d, Y"
+    FullDateTimePattern:               "l, F d, Y g:i:s A"
+    MonthDayPattern:                   "F d"
+    ShortTimePattern:                  "g:i A"
+    LongTimePattern:                   "g:i:s A"
+    SortableDateTimePattern:           "Y-m-d\\TH:i:s"
+    UniversalSortableDateTimePattern:  "Y-m-d H:i:sO"
+    YearMonthPattern:                  "F, Y"
+
+Supported Mask Characters:
+  d    day 01-31
+  D    day of week, first three letters
+  j    day 1-31
+  l    day of week
+  S    ordinal suffix
+  w    day of week 0-6
+  z    day of the year, 0-364
+  W    ISO week number
+  F    month name
+  m    month 01-12 
+  M    month, first three letters
+  n    month 1-12
+  t    days in month
+  L    leap year, 0 or 1
+  Y    4 digit year
+  y    2 digit year
+  a    am/pm
+  A    AM/PM
+  g    hours 1-12
+  G    hours 0-23
+  h    hours 01-12
+  H    hours 00-23
+  i    minutes 00-59
+  s    seconds 00-59
+  O    GMT offset
+  T    timezone
+  Z    timezone offset
+  U    seconds since UNIX epoch
+
